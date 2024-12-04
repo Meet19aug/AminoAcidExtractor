@@ -1,0 +1,9 @@
+Flask==3.1.0
+python-dotenv==1.0.1
+camelot-py==0.11.0
+opencv-python==4.10.0.84
+pdfplumber==0.11.4
+llama-index-core==0.12.2
+llama-parse==0.5.16
+llama-index-readers-file==0.4.0
+tabula-py==2.10.0
