@@ -41,13 +41,22 @@ This project automates the extraction of amino acid data and metadata from PDF d
    ```bash
    pip install -r requirements.txt
    ```
+4: **Configure Your API Key**:
 
-4. **Set up environment variables**:
-   Create a `.env` file in the root directory with the required configuration (e.g., file paths or API keys).
+To use Llama Cloud, you need to set your API key in the environment variables. Follow these steps:
+
+1. Get your API key from the [LlamaIndex Cloud Documentation](https://docs.cloud.llamaindex.ai/llamaparse/getting_started/get_an_api_key).
+2. Add the following line to your `.env` file or your terminal environment:
+
+   ```bash
+   LLAMA_CLOUD_API_KEY=llx-your-api-key
+   ```
+
+Replace `llx-your-api-key` with the API key you generated in step 1.
 
 5. **Run the Flask app**:
    ```bash
-   python app.py
+   python main.py
    ```
 
 6. **Access the application**:
@@ -79,7 +88,6 @@ The extracted tables will be saved in the `output` directory.
 - **`app.py`**: Flask application for handling PDF uploads and table extraction.
 - **`extract_complex_pdf.py`**: Core logic for table extraction and metadata processing.
 - **`requirements.txt`**: List of required Python packages.
-- **`llama_parse.py`**: Custom integration with LlamaIndex for advanced document parsing.
 
 ## Examples
 
