@@ -1,3 +1,5 @@
+import pprint
+
 from flask import Flask, request, jsonify, send_file, make_response, render_template
 from dotenv import load_dotenv
 import camelot
@@ -16,38 +18,30 @@ import nest_asyncio
 
 load_dotenv()
 
-def extract_doi_and_title(pdf_path):
-    """
-    Extract DOI and title from the first page of the PDF using pdfplumber
-    Returns tuple of (doi, title)
-    """
+def extract_doi(pdf_path):
     try:
         with pdfplumber.open(pdf_path) as pdf:
-            # Get first page text
+            # Get the text from the first page
             first_page = pdf.pages[0]
             text = first_page.extract_text()
 
             if not text:
-                return None, None
+                return None  # Return None if no text is found
 
-            # Extract DOI - looking specifically for http://dx.doi.org/ pattern
-            doi_match = re.search(r'http://dx\.doi\.org/[^\s]+', text)
-            if not doi_match:
-                # Backup patterns
-                doi_match = re.search(r'(?:doi:|DOI:|https?://doi\.org/)[^\s]+', text)
+            # Combine all patterns into one for efficiency
+            patterns = [
+                r'http://dx\.doi\.org/[^\s]+',               # Pattern 1: dx.doi.org URL
+                r'(?:doi:|DOI:|https?://doi\.org/)[^\s]+',   # Pattern 2: General DOI patterns
+                r'DOI:\s*10\.\d{4,9}/[^\s]+'                 # Pattern 3: DOI with prefix "DOI: 10."
+            ]
+
+            # Compile a single regex pattern
+            combined_pattern = '|'.join(patterns)
+            doi_match = re.search(combined_pattern, text)
 
             doi = doi_match.group(0) if doi_match else None
+            return doi
 
-            # Extract title - typically the first substantial line before Abstract/Introduction
-            lines = [line.strip() for line in text.split('\n') if line.strip()]
-            title = None
-            for line in lines:
-                # Skip very short lines or lines that are likely headers/metadata
-                if len(line) > 20 and not any(x in line.lower() for x in ['doi:', 'http:', 'abstract', 'introduction']):
-                    title = line
-                    break
-
-            return doi, title
     except Exception as e:
         print(f"Error extracting DOI and title: {str(e)}")
         return None, None
@@ -292,6 +286,7 @@ def process_categories(df):
         print(f"Warning: Error in category processing - {str(e)}")
         return df
 
+
 @app.route('/extract-tables', methods=['POST'])
 def extract_tables():
     if 'file' not in request.files:
@@ -337,15 +332,20 @@ def extract_tables():
 
         print("Exectuing LLAma")
         # If no tables are found, fallback to Llama-based extraction
-        parser = LlamaParse(result_type="markdown")
+        parser = LlamaParse(do_not_unroll_columns=True, result_type="markdown")
         nest_asyncio.apply()
         documents = SimpleDirectoryReader(input_files=[temp_pdf_path], file_extractor={".pdf": parser}).load_data()
+        pprint.pprint(documents)
+
+        doi = extract_doi(temp_pdf_path)
+
+        print(doi)
 
         if not documents:
             return jsonify({"message": "No tables or structured data found in the PDF"}), 200
 
         output_dir = tempfile.mkdtemp()
-        extract_and_save_tables(documents, output_dir=output_dir)
+        extract_and_save_tables(documents, output_dir=output_dir, doi=doi)
 
         # Zip the extracted tables
         temp_zip_stream = io.BytesIO()
@@ -368,77 +368,8 @@ def extract_tables():
     finally:
         if os.path.exists(temp_pdf_path):
             os.remove(temp_pdf_path)
-#
-# @app.route('/extract-tables', methods=['POST'])
-# def extract_tables():
-#     if 'file' not in request.files:
-#         return jsonify({"error": "No file provided"}), 400
-#
-#     file = request.files['file']
-#     if file.filename == '':
-#         return jsonify({"error": "No selected file"}), 400
-#
-#     if not file.filename.endswith('.pdf'):
-#         return jsonify({"error": "File format not supported, please upload a PDF"}), 400
-#
-#     try:
-#         temp_pdf_path = os.path.join(tempfile.gettempdir(), file.filename)
-#         file.save(temp_pdf_path)
-#
-#         # Extract DOI and title first
-#         doi, title = extract_doi_and_title(temp_pdf_path)
-#
-#         # Use lattice flavor for complex tables with lines
-#         tables = camelot.read_pdf(temp_pdf_path, pages='all', flavor='stream')
-#         if not tables:
-#             tables = camelot.read_pdf(temp_pdf_path, pages='all', flavor='lattice')
-#
-#         if not tables:
-#             return jsonify({"message": "No tables found in the PDF"}), 200
-#
-#         temp_zip_stream = io.BytesIO()
-#
-#         with zipfile.ZipFile(temp_zip_stream, 'w') as temp_zip:
-#             for i, table in enumerate(tables):
-#                 try:
-#                     df = table.df
-#
-#                     if is_potential_table(df):
-#                         table_number, table_description = extract_table_metadata(
-#                             temp_pdf_path,
-#                             table.parsing_report['page']
-#                         )
-#
-#                         validated_df = validate_and_clean_table_data(df, doi, title)
-#
-#                         if validated_df is not None:
-#                             # Write to CSV
-#                             csv_stream = io.StringIO()
-#                             validated_df.to_csv(csv_stream, index=False)
-#                             csv_stream.seek(0)
-#                             csv_filename = f"Table_{table_number or (i+1)}_processed.csv"
-#                             temp_zip.writestr(csv_filename, csv_stream.read())
-#
-#                 except Exception as e:
-#                     print(f"Error processing Table {i+1}: {str(e)}")
-#                     continue
-#
-#         temp_zip_stream.seek(0)
-#
-#         response = make_response(send_file(
-#             temp_zip_stream,
-#             mimetype='application/zip',
-#             as_attachment=True,
-#             download_name='processed_tables.zip'
-#         ))
-#         response.headers['Content-Disposition'] = 'attachment; filename=processed_tables.zip'
-#         return response
-#
-#     except Exception as e:
-#         return jsonify({"error": str(e)}), 500
-#     finally:
-#         if os.path.exists(temp_pdf_path):
-#             os.remove(temp_pdf_path)
+
+
 @app.route('/', methods=['GET'])
 def index():
     return render_template("index.html")
