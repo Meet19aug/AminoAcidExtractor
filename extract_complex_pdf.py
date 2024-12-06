@@ -128,11 +128,15 @@ if __name__ == '__main__':
     file_extractor = {".pdf": parser}
 
     nest_asyncio.apply()
-    documents = SimpleDirectoryReader(input_files=['sample.pdf'], file_extractor=file_extractor).load_data()
+    documents = SimpleDirectoryReader(input_files=['Food Science   Nutrition - 2023 - Nosworthy - The in vivo and in vitro protein quality of three hemp protein sources.pdf'], file_extractor=file_extractor).load_data()
 
     print(documents)
 
-    pprint.pprint(documents)
+    for i,document in enumerate(documents):
+        print()
+        pprint.pprint(i+ "--->  "+document.text)
+
+    #pprint.pprint(documents)
     # Assuming 'documents' is already defined from the previous context
     extract_and_save_tables(documents)
 

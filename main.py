@@ -328,6 +328,7 @@ def extract_tables():
                         print(f"Error processing Table {i+1}: {str(e)}")
                         continue
             temp_zip_stream.seek(0)
+            print("-----------> Returning the zip file [camelot_tables.zip]")
             return send_file(
                 temp_zip_stream,
                 mimetype='application/zip',
@@ -356,6 +357,7 @@ def extract_tables():
                     temp_zip.write(file_path, os.path.relpath(file_path, output_dir))
 
         temp_zip_stream.seek(0)
+        print("-----------> Returning the zip file + ")
         return send_file(
             temp_zip_stream,
             mimetype='application/zip',
